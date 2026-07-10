@@ -1,13 +1,15 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Void Studios CRM</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
-</html>
+# Copy this file to .env for local development only.
+# NEVER commit the real .env file to git (it's already in .gitignore).
+# For production, set these as Environment Variables in the Vercel dashboard instead.
+
+# Used by the frontend (Vite) - safe to expose in the browser
+VITE_SUPABASE_URL=""
+VITE_SUPABASE_ANON_KEY=""
+NEXT_PUBLIC_SUPABASE_URL=""
+
+# Used by the backend (/api functions) - KEEP SECRET, server-side only
+SUPABASE_SERVICE_ROLE_KEY=""
+
+# Optional - only needed if using the Supabase free-tier auto-wake feature
+FULLSTACK_PROJECT_REF=""
+FULLSTACK_RESTORE_API_URL=""

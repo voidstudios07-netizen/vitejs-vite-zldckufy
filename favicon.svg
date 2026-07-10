@@ -1,0 +1,70 @@
+import supabase from './db-client.js';
+
+function cors(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
+async function requireProfile(req) {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  if (!token) throw new Error('Unauthorized');
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) throw new Error('Invalid token');
+  const { data: profile, error: pError } = await supabase.from('sales_reps').select('*').eq('email', user.email).single();
+  if (pError) throw pError;
+  return profile;
+}
+const probabilities = { 'Discovery Call': 10, 'Technical Scoping': 30, 'Proposal Sent': 60, 'Closed Won': 100 };
+
+export default async function handler(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  try {
+    const profile = await requireProfile(req);
+    if (req.method === 'GET') {
+      let query = supabase.from('opportunities').select('*').order('close_date', { ascending: true });
+      if (profile.role !== 'admin') query = query.eq('owner_email', profile.email);
+      const { data, error } = await query;
+      if (error) throw error;
+      const rate = Number(profile.commission_rate ?? 10);
+      const withCommission = data.map((o) => ({ ...o, commission_amount: o.stage === 'Closed Won' ? Number(o.amount || 0) * (rate / 100) : null }));
+      return res.status(200).json(withCommission);
+    }
+    if (req.method === 'POST') {
+      const body = req.body || {};
+      const stage = body.stage || 'Discovery Call';
+      if (!body.deal_name || !body.amount || !body.revenue_type || !body.contract_term || !body.close_date) return res.status(400).json({ error: 'Deal name, amount, revenue type, term, and close date are required.' });
+      const { data, error } = await supabase.from('opportunities').insert({ account_id: body.account_id || null, deal_name: body.deal_name, stage, amount: body.amount, revenue_type: body.revenue_type, contract_term: body.contract_term, close_date: body.close_date, win_probability: probabilities[stage] || 10, owner_email: profile.role === 'admin' && body.owner_email ? body.owner_email : profile.email }).select().single();
+      if (error) throw error;
+      return res.status(201).json(data);
+    }
+    if (req.method === 'PUT') {
+      const { id, fields } = req.body || {};
+      if (!id || !fields) return res.status(400).json({ error: 'Opportunity id and fields are required.' });
+      const { data: opp, error: oppError } = await supabase.from('opportunities').select('*').eq('id', id).single();
+      if (oppError) throw oppError;
+      if (profile.role !== 'admin' && opp.owner_email !== profile.email) return res.status(403).json({ error: 'Forbidden' });
+      const update = { ...fields };
+      if (fields.stage) update.win_probability = probabilities[fields.stage] || opp.win_probability;
+      const { data, error } = await supabase.from('opportunities').update(update).eq('id', id).select().single();
+      if (error) throw error;
+      await supabase.from('activities').insert({ opportunity_id: id, rep_email: profile.email, type: 'Opportunity Updated', note: fields.stage ? `Moved to ${fields.stage}` : 'Opportunity details updated' });
+      return res.status(200).json(data);
+    }
+    if (req.method === 'DELETE') {
+      const { id } = req.body || {};
+      if (!id) return res.status(400).json({ error: 'Opportunity id is required.' });
+      const { data: opp, error: oppError } = await supabase.from('opportunities').select('*').eq('id', id).single();
+      if (oppError) throw oppError;
+      if (profile.role !== 'admin' && opp.owner_email !== profile.email) return res.status(403).json({ error: 'Forbidden' });
+      const { error } = await supabase.from('opportunities').delete().eq('id', id);
+      if (error) throw error;
+      return res.status(200).json({ ok: true });
+    }
+    res.status(405).json({ error: 'Method not allowed' });
+  } catch (err) {
+    console.error('API error:', err);
+    const status = err.message === 'Unauthorized' || err.message === 'Invalid token' ? 401 : 500;
+    res.status(status).json({ error: err.message });
+  }
+}
