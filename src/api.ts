@@ -1,8 +1,8 @@
 export type SessionBundle = { token: string; profile: SalesRep };
 
-export type SalesRep = { id: number; name: string; email: string; role: 'admin' | 'employee'; title: string; avatar_color: string };
+export type SalesRep = { id: number; name: string; email: string; role: 'admin' | 'employee'; title: string; avatar_color: string; commission_rate?: number; commission_earned?: number; closed_won_count?: number };
 export type Lead = { id: number; name: string; phone: string; source_url: string; website_status: string; call_count: number; gatekeeper_name: string; lead_owner: string; status: string; follow_up_date?: string; created_at: string };
-export type Opportunity = { id: number; account_id?: number; deal_name: string; stage: string; amount: number; revenue_type: string; contract_term: number; close_date: string; win_probability: number; owner_email: string; created_at: string };
+export type Opportunity = { id: number; account_id?: number; deal_name: string; stage: string; amount: number; revenue_type: string; contract_term: number; close_date: string; win_probability: number; owner_email: string; created_at: string; commission_amount?: number | null };
 export type Account = { id: number; company_name: string; industry: string; location: string; created_at: string };
 export type Contact = { id: number; account_id: number; first_name: string; last_name: string; email: string; phone: string; role_title: string };
 export type MaintenancePlan = { id: number; opportunity_id?: number; client_name: string; service_name: string; monthly_fee: number; billing_day: number; status: string; owner_email: string; next_invoice_date: string; created_at: string };
@@ -26,3 +26,5 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
 
 export const money = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(value || 0));
 export const tcv = (opp: Opportunity) => opp.revenue_type === 'Recurring Retainer' ? Number(opp.amount) * Number(opp.contract_term || 1) : Number(opp.amount);
+export const isOverdue = (plan: MaintenancePlan) => plan.status === 'Active' && new Date(plan.next_invoice_date) < new Date();
+export const isDueSoon = (plan: MaintenancePlan) => { if (plan.status !== 'Active') return false; const d = new Date(plan.next_invoice_date); const now = new Date(); const in3 = new Date(Date.now() + 3 * 86400000); return d >= now && d <= in3; };
