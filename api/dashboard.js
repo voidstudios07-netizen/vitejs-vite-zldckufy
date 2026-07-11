@@ -59,4 +59,10 @@ export default async function handler(req, res) {
     const overdueInvoices = activeMaint.filter((m) => new Date(m.next_invoice_date) < now);
     const upcomingInvoices = activeMaint.filter((m) => { const d = new Date(m.next_invoice_date); return d >= now && d <= in3Days; });
 
-    return res.status(200).json({ profile, leaderGrid, financials: { rawPipeline, expectedRevenue, mrr, monthlyMaintenance, commissionEarned, commissionRate: repRate, ownerVisible: profile.role === 'admin' }, opportunities, maintenance,
+    return res.status(200).json({ profile, leaderGrid, financials: { rawPipeline, expectedRevenue, mrr, monthlyMaintenance, commissionEarned, commissionRate: repRate, ownerVisible: profile.role === 'admin' }, opportunities, maintenance, overdueInvoices, upcomingInvoices });
+  } catch (err) {
+    console.error('API error:', err);
+    const status = err.message === 'Unauthorized' || err.message === 'Invalid token' ? 401 : 500;
+    res.status(status).json({ error: err.message });
+  }
+}
