@@ -47,24 +47,46 @@ function Login({ onLogin }: { onLogin: (u: UserState) => void }) {
 function Shell({ auth, view, setView, onLogout }: { auth: NonNullable<UserState>; view: View; setView: (v: View) => void; onLogout: () => void }) {
   const nav = [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3 }, { id: 'leads', label: 'Outbound Panel', icon: PhoneCall }, { id: 'pipeline', label: 'Pipeline', icon: KanbanSquare }, { id: 'maintenance', label: 'Monthly Maintenance', icon: Wrench }, { id: 'accounts', label: 'Accounts', icon: Building2 }, ...(auth.profile.role === 'admin' ? [{ id: 'admin' as const, label: 'Admin Portal', icon: Crown }] : [])] as const;
   return <div className="flex min-h-screen bg-[#08090c] text-slate-100">
-    <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-white/10 bg-[#0c0e13]/95 p-4 backdrop-blur md:block"><div className="mb-8 flex items-center justify-between px-2"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-violet-500 font-black text-black">V</div><div><div className="font-semibold">Void Studios</div><div className="text-xs text-slate-500">CRM</div></div></div><div className="flex items-center gap-2"><GlobalSearch /><NotificationBell /></div></div><nav className="space-y-1">{nav.map((item) => <button key={item.id} onClick={() => setView(item.id)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${view === item.id ? 'bg-white text-black' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><item.icon size={18} />{item.label}</button>)}</nav><div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/10 bg-white/[.03] p-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-full text-sm font-bold text-black" style={{ background: auth.profile.avatar_color }}>{auth.profile.name[0]}</div><div className="min-w-0"><div className="truncate text-sm font-medium">{auth.profile.name}</div><div className="truncate text-xs text-slate-500">{auth.profile.role === 'admin' ? 'Admin / Owner' : 'Sales Employee'}</div></div></div><button onClick={onLogout} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 py-2 text-sm text-slate-400 hover:text-white"><LogOut size={16} /> Sign out</button></div></aside>
+    <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-white/10 bg-[#0c0e13]/95 p-4 backdrop-blur md:block"><div className="mb-8 flex items-center justify-between px-2"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-violet-500 font-black text-black">V</div><div><div className="font-semibold">Void Studios</div><div className="text-xs text-slate-500">CRM</div></div></div><div className="flex items-center gap-2"><GlobalSearch /><NotificationBell profile={auth.profile} /></div></div><nav className="space-y-1">{nav.map((item) => <button key={item.id} onClick={() => setView(item.id)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${view === item.id ? 'bg-white text-black' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><item.icon size={18} />{item.label}</button>)}</nav><div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/10 bg-white/[.03] p-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-full text-sm font-bold text-black" style={{ background: auth.profile.avatar_color }}>{auth.profile.name[0]}</div><div className="min-w-0"><div className="truncate text-sm font-medium">{auth.profile.name}</div><div className="truncate text-xs text-slate-500">{auth.profile.role === 'admin' ? 'Admin / Owner' : 'Sales Employee'}</div></div></div><button onClick={onLogout} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 py-2 text-sm text-slate-400 hover:text-white"><LogOut size={16} /> Sign out</button></div></aside>
     <div className="min-w-0 flex-1 md:ml-72">
-      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-[#0c0e13]/95 px-4 py-3 backdrop-blur md:hidden"><div className="flex items-center gap-2"><div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-cyan-300 to-violet-500 text-sm font-black text-black">V</div><span className="font-semibold">Void Studios</span></div><div className="flex items-center gap-2"><GlobalSearch /><NotificationBell /><button onClick={onLogout} className="rounded-lg border border-white/10 p-2 text-slate-400 hover:text-white"><LogOut size={16} /></button></div></div>
+      <div className="sticky top-0 z-20 flex items-center justify-between border-b border-white/10 bg-[#0c0e13]/95 px-4 py-3 backdrop-blur md:hidden"><div className="flex items-center gap-2"><div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-cyan-300 to-violet-500 text-sm font-black text-black">V</div><span className="font-semibold">Void Studios</span></div><div className="flex items-center gap-2"><GlobalSearch /><NotificationBell profile={auth.profile} /><button onClick={onLogout} className="rounded-lg border border-white/10 p-2 text-slate-400 hover:text-white"><LogOut size={16} /></button></div></div>
       <main className="min-w-0 p-4 md:p-8"><div className="mb-4 flex gap-2 overflow-x-auto md:hidden">{nav.map((item) => <button key={item.id} onClick={() => setView(item.id)} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm ${view === item.id ? 'bg-white text-black' : 'bg-white/5 text-slate-300'}`}>{item.label}</button>)}</div>{view === 'dashboard' && <Dashboard />}{view === 'leads' && <LeadsPanel profile={auth.profile} />}{view === 'pipeline' && <Pipeline profile={auth.profile} />}{view === 'maintenance' && <MonthlyMaintenance />}{view === 'accounts' && <AccountsContacts />}{view === 'admin' && <AdminPortal />}</main>
     </div>
   </div>;
 }
 
-function NotificationBell() {
+function NotificationBell({ profile }: { profile: SalesRep }) {
   const [open, setOpen] = useState(false);
   const [overdue, setOverdue] = useState<MaintenancePlan[]>([]);
   const [upcoming, setUpcoming] = useState<MaintenancePlan[]>([]);
-  useEffect(() => { apiFetch<any>('/api/dashboard').then((d) => { setOverdue(d.overdueInvoices || []); setUpcoming(d.upcomingInvoices || []); }).catch(() => {}); }, []);
-  const total = overdue.length + upcoming.length;
-  return <div className="relative"><button onClick={() => setOpen((o) => !o)} className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 hover:text-white"><Bell size={16} />{total > 0 && <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-[10px] font-bold text-white">{total}</span>}</button>
-    {open && <div className="absolute right-0 top-11 z-40 w-80 max-w-[85vw] rounded-2xl border border-white/10 bg-[#101218] p-3 shadow-2xl">
+  const [messages, setMessages] = useState<any[]>([]);
+  const [reps, setReps] = useState<SalesRep[]>([]);
+  const [composeBody, setComposeBody] = useState('');
+  const [composeTo, setComposeTo] = useState('');
+  const [sending, setSending] = useState(false);
+  const loadAll = () => {
+    apiFetch<any>('/api/dashboard').then((d) => { setOverdue(d.overdueInvoices || []); setUpcoming(d.upcomingInvoices || []); }).catch(() => {});
+    apiFetch<any[]>('/api/messages').then(setMessages).catch(() => {});
+  };
+  useEffect(loadAll, []);
+  useEffect(() => { if (profile.role === 'admin') apiFetch<SalesRep[]>('/api/reps').then(setReps).catch(() => {}); }, [profile.role]);
+  async function sendMessage() {
+    if (!composeBody.trim()) return;
+    setSending(true);
+    try { await apiFetch('/api/messages', { method: 'POST', body: JSON.stringify({ body: composeBody, to_email: composeTo || null }) }); setComposeBody(''); setComposeTo(''); } catch { /* ignore */ } finally { setSending(false); }
+  }
+  const total = overdue.length + upcoming.length + messages.length;
+  return <div className="relative"><button onClick={() => { setOpen((o) => !o); if (!open) loadAll(); }} className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 hover:text-white"><Bell size={16} />{total > 0 && <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-[10px] font-bold text-white">{total}</span>}</button>
+    {open && <div className="absolute right-0 top-11 z-40 w-80 max-w-[85vw] max-h-[70vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#101218] p-3 shadow-2xl">
+      {profile.role === 'admin' && <div className="mb-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3">
+        <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-cyan-300">Send a message</div>
+        <select value={composeTo} onChange={(e) => setComposeTo(e.target.value)} className="field w-full mb-2 !py-1.5 !px-2 text-xs"><option value="">All employees</option>{reps.filter((r) => r.email !== profile.email).map((r) => <option key={r.email} value={r.email}>{r.name}</option>)}</select>
+        <textarea value={composeBody} onChange={(e) => setComposeBody(e.target.value)} placeholder="Write an announcement..." rows={2} className="field w-full mb-2 text-xs" />
+        <button disabled={sending || !composeBody.trim()} onClick={sendMessage} className="w-full rounded-lg bg-cyan-300 py-1.5 text-xs font-semibold text-black disabled:opacity-50">{sending ? 'Sending...' : 'Send'}</button>
+      </div>}
+      {messages.length > 0 && <div className="mb-3"><div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Messages</div>{messages.map((m) => <div key={m.id} className="mb-1.5 rounded-xl bg-violet-500/10 px-3 py-2 text-sm"><div className="text-violet-100">{m.body}</div><div className="mt-1 text-[10px] text-violet-300/70">{m.from_email} • {new Date(m.created_at).toLocaleString()}</div></div>)}</div>}
       <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Invoice reminders</div>
-      {total === 0 && <p className="px-1 py-3 text-sm text-slate-500">No invoices due soon. You're all caught up.</p>}
+      {overdue.length === 0 && upcoming.length === 0 && <p className="px-1 py-3 text-sm text-slate-500">No invoices due soon. You're all caught up.</p>}
       {overdue.map((m) => <div key={`o-${m.id}`} className="mb-1 flex items-center justify-between gap-2 rounded-xl bg-rose-500/10 px-3 py-2 text-sm"><span className="truncate text-rose-100">{m.client_name}</span><span className="whitespace-nowrap text-xs text-rose-300">Overdue</span></div>)}
       {upcoming.map((m) => <div key={`u-${m.id}`} className="mb-1 flex items-center justify-between gap-2 rounded-xl bg-amber-500/10 px-3 py-2 text-sm"><span className="truncate text-amber-100">{m.client_name}</span><span className="whitespace-nowrap text-xs text-amber-300">{m.next_invoice_date.slice(0, 10)}</span></div>)}
     </div>}
@@ -205,8 +227,10 @@ function AdminPortal() {
   const [data, setData] = useState<any>(null), [loading, setLoading] = useState(true), [error, setError] = useState('');
   const [selectedRep, setSelectedRep] = useState<any | null>(null);
   const [rateSaving, setRateSaving] = useState<string | null>(null);
+  const [loginLogs, setLoginLogs] = useState<{ id: number; rep_email: string; logged_in_at: string }[]>([]);
   const load = () => { setLoading(true); apiFetch<any>('/api/admin').then(setData).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(load, []);
+  useEffect(() => { apiFetch<any[]>('/api/login-logs').then(setLoginLogs).catch(() => {}); }, []);
   async function saveCommission(email: string, rate: number) { setRateSaving(email); try { await apiFetch('/api/admin', { method: 'PUT', body: JSON.stringify({ email, commission_rate: rate }) }); await load(); } catch (e: any) { setError(e.message); } finally { setRateSaving(null); } }
   const [reassigning, setReassigning] = useState<number | null>(null);
   async function reassignLead(leadId: number, newOwner: string) { setReassigning(leadId); try { await apiFetch('/api/leads', { method: 'PUT', body: JSON.stringify({ id: leadId, fields: { lead_owner: newOwner } }) }); await load(); } catch (e: any) { setError(e.message); } finally { setReassigning(null); } }
@@ -215,6 +239,11 @@ function AdminPortal() {
 
   const totalDeals = data.opportunities.reduce((s: number, o: Opportunity) => s + Number(o.amount), 0);
   const maintenance = data.maintenance.filter((m: MaintenancePlan) => m.status === 'Active').reduce((s: number, m: MaintenancePlan) => s + Number(m.monthly_fee), 0);
+  const repNameByEmail: Record<string, string> = {}; data.reps.forEach((r: SalesRep) => { repNameByEmail[r.email] = r.name; });
+  const loginsByDay: Record<string, typeof loginLogs> = {};
+  loginLogs.forEach((l) => { const day = new Date(l.logged_in_at).toDateString(); (loginsByDay[day] ||= []).push(l); });
+  const todayStr = new Date().toDateString();
+  const loginDayKeys = Object.keys(loginsByDay).slice(0, 7);
 
   if (selectedRep) {
     const repLeads = data.leads.filter((l: any) => l.lead_owner === selectedRep.name || l.owner_email === selectedRep.email);
@@ -327,6 +356,17 @@ function AdminPortal() {
               </div>
             </div>
           ))}
+        </div>
+      </div>
+
+      <div className="mt-6 rounded-3xl border border-white/10 bg-[#101218] p-5">
+        <div className="mb-4 text-base font-semibold text-slate-200">Employee Login Activity</div>
+        {loginDayKeys.length === 0 && <p className="text-sm text-slate-500">No login activity recorded yet.</p>}
+        <div className="max-h-96 overflow-y-auto space-y-4 pr-1">
+          {loginDayKeys.map((day) => <div key={day}>
+            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-cyan-300">{day === todayStr ? 'Today' : day}</div>
+            <div className="space-y-1.5">{loginsByDay[day].map((l) => <div key={l.id} className="flex items-center justify-between rounded-xl bg-white/[.03] px-3 py-2 text-sm"><span className="text-slate-200">{repNameByEmail[l.rep_email] || l.rep_email}</span><span className="text-xs text-slate-500">{new Date(l.logged_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>)}</div>
+          </div>)}
         </div>
       </div>
 
