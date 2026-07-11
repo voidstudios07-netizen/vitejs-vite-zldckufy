@@ -21,6 +21,12 @@ export default async function handler(req, res) {
   try {
     const profile = await requireProfile(req);
     if (req.method === 'GET') {
+      if (req.query.resource === 'reps') {
+        if (profile.role !== 'admin') return res.status(403).json({ error: 'Admin access required' });
+        const { data, error } = await supabase.from('sales_reps').select('id, name, email, role, avatar_color').order('name', { ascending: true });
+        if (error) throw error;
+        return res.status(200).json(data);
+      }
       const { data, error } = await supabase
         .from('messages')
         .select('*')
