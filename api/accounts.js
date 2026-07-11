@@ -31,7 +31,10 @@ export default async function handler(req, res) {
       const ids = (accounts || []).map((a) => a.id);
       const { data: contacts, error: cError } = ids.length ? await supabase.from('contacts').select('*').in('account_id', ids) : { data: [], error: null };
       if (cError) throw cError;
-      return res.status(200).json({ accounts, contacts, opportunities });
+      const oppIds = (opportunities || []).map((o) => o.id);
+      const { data: activities, error: actError } = oppIds.length ? await supabase.from('activities').select('*').in('opportunity_id', oppIds).order('created_at', { ascending: false }) : { data: [], error: null };
+      if (actError) throw actError;
+      return res.status(200).json({ accounts, contacts, opportunities, activities });
     }
     if (req.method === 'POST') {
       const { company_name, industry, location, contact } = req.body || {};
