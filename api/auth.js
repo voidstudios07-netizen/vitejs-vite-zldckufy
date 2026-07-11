@@ -61,7 +61,10 @@ export default async function handler(req, res) {
     
     // Grab their pre-configured profile details
     const { data: profile } = await supabase.from('sales_reps').select('*').eq('email', sanitizedEmail).single();
-    
+
+    // Log this login for admin visibility (non-blocking — never fail the login over this)
+    supabase.from('login_logs').insert({ rep_email: sanitizedEmail }).then(() => {}).catch(() => {});
+
     return res.status(200).json({ 
       session: data.session, 
       user: data.user, 
