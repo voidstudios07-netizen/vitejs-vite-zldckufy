@@ -46,10 +46,17 @@ export default async function handler(req, res) {
     const expectedRevenue = activeOpps.reduce((sum, o) => sum + Number(o.amount || 0) * (Number(o.win_probability || 0) / 100), 0);
     const mrr = opportunities.filter((o) => o.stage === 'Closed Won' && o.revenue_type === 'Recurring Retainer').reduce((sum, o) => sum + Number(o.amount || 0), 0);
     const monthlyMaintenance = maintenance.filter((m) => m.status === 'Active').reduce((sum, m) => sum + Number(m.monthly_fee || 0), 0);
-    return res.status(200).json({ profile, leaderGrid, financials: { rawPipeline, expectedRevenue, mrr, monthlyMaintenance, ownerVisible: profile.role === 'admin' }, opportunities, maintenance });
-  } catch (err) {
-    console.error('API error:', err);
-    const status = err.message === 'Unauthorized' || err.message === 'Invalid token' ? 401 : 500;
-    res.status(status).json({ error: err.message });
-  }
-}
+
+    // Commission: this rep's commission on their own Closed Won deals
+    const repRate = Number(profile.commission_rate ?? 10);
+    const ownClosedWon = opportunities.filter((o) => o.stage === 'Closed Won' && o.owner_email === profile.email);
+    const commissionEarned = ownClosedWon.reduce((sum, o) => sum + Number(o.amount || 0) * (repRate / 100), 0);
+
+    // Invoice reminders / churn risk: computed from next_invoice_date on active maintenance plans
+    const now = new Date();
+    const in3Days = new Date(Date.now() + 3 * 86400000);
+    const activeMaint = maintenance.filter((m) => m.status === 'Active');
+    const overdueInvoices = activeMaint.filter((m) => new Date(m.next_invoice_date) < now);
+    const upcomingInvoices = activeMaint.filter((m) => { const d = new Date(m.next_invoice_date); return d >= now && d <= in3Days; });
+
+    return res.status(200).json({ profile, leaderGrid, financials: { rawPipeline, expectedRevenue, mrr, monthlyMaintenance, commissionEarned, commissionRate: repRate, ownerVisible: profile.role === 'admin' }, opportunities, maintenance,
