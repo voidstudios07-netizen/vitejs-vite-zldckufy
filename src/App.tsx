@@ -69,7 +69,7 @@ function NotificationBell({ profile }: { profile: SalesRep }) {
     apiFetch<any[]>('/api/messages').then(setMessages).catch(() => {});
   };
   useEffect(loadAll, []);
-  useEffect(() => { if (profile.role === 'admin') apiFetch<SalesRep[]>('/api/reps').then(setReps).catch(() => {}); }, [profile.role]);
+  useEffect(() => { if (profile.role === 'admin') apiFetch<SalesRep[]>('/api/messages?resource=reps').then(setReps).catch(() => {}); }, [profile.role]);
   async function sendMessage() {
     if (!composeBody.trim()) return;
     setSending(true);
@@ -151,7 +151,7 @@ function LeadsPanel({ profile }: { profile: SalesRep }) {
   const [sentIds, setSentIds] = useState<Set<number>>(new Set());
   const toggleSelect = (id: number) => setSelected((prev) => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
   const toWhatsAppNumber = (phone: string) => { let d = phone.replace(/\D/g, ''); if (d.startsWith('0')) d = d.slice(1); if (d.length === 10) d = '91' + d; return d; };
-  useEffect(() => { if (profile.role === 'admin') apiFetch<SalesRep[]>('/api/reps').then(setReps).catch(() => {}); }, [profile.role]);
+  useEffect(() => { if (profile.role === 'admin') apiFetch<SalesRep[]>('/api/messages?resource=reps').then(setReps).catch(() => {}); }, [profile.role]);
   useEffect(() => { if (profile.role === 'admin') apiFetch<Lead[]>('/api/leads').then((all) => { const counts: Record<string, number> = {}; all.forEach((l) => { counts[l.lead_owner] = (counts[l.lead_owner] || 0) + 1; }); setOwnerCounts(counts); }).catch(() => {}); }, [profile.role, leads.length]);
   const load = () => { setLoading(true); const q = profile.role === 'admin' && selectedOwner ? `?owner=${encodeURIComponent(selectedOwner)}` : ''; apiFetch<Lead[]>(`/api/leads${q}`).then((d) => { setLeads(d); setActive(d[0] || null); }).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(load, [selectedOwner]);
@@ -186,7 +186,7 @@ function Pipeline({ profile }: { profile: SalesRep }) {
   const [form, setForm] = useState({ deal_name: '', amount: 5000, revenue_type: 'One-Time Project', contract_term: 1, close_date: new Date(Date.now() + 21 * 86400000).toISOString().slice(0, 10) });
   const [reps, setReps] = useState<SalesRep[]>([]), [selectedOwner, setSelectedOwner] = useState('');
   const [ownerCounts, setOwnerCounts] = useState<Record<string, number>>({});
-  useEffect(() => { if (profile.role === 'admin') apiFetch<SalesRep[]>('/api/reps').then(setReps).catch(() => {}); }, [profile.role]);
+  useEffect(() => { if (profile.role === 'admin') apiFetch<SalesRep[]>('/api/messages?resource=reps').then(setReps).catch(() => {}); }, [profile.role]);
   useEffect(() => { if (profile.role === 'admin') apiFetch<Opportunity[]>('/api/opportunities').then((all) => { const counts: Record<string, number> = {}; all.forEach((o) => { counts[o.owner_email] = (counts[o.owner_email] || 0) + 1; }); setOwnerCounts(counts); }).catch(() => {}); }, [profile.role, opps.length]);
   const load = () => { setLoading(true); const q = profile.role === 'admin' && selectedOwner ? `?owner=${encodeURIComponent(selectedOwner)}` : ''; Promise.all([apiFetch<Opportunity[]>(`/api/opportunities${q}`), apiFetch<MaintenancePlan[]>('/api/maintenance')]).then(([o, m]) => { setOpps(o); setMaintenance(m); }).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(load, [selectedOwner]);
@@ -227,10 +227,8 @@ function AdminPortal() {
   const [data, setData] = useState<any>(null), [loading, setLoading] = useState(true), [error, setError] = useState('');
   const [selectedRep, setSelectedRep] = useState<any | null>(null);
   const [rateSaving, setRateSaving] = useState<string | null>(null);
-  const [loginLogs, setLoginLogs] = useState<{ id: number; rep_email: string; logged_in_at: string }[]>([]);
   const load = () => { setLoading(true); apiFetch<any>('/api/admin').then(setData).catch((e) => setError(e.message)).finally(() => setLoading(false)); };
   useEffect(load, []);
-  useEffect(() => { apiFetch<any[]>('/api/login-logs').then(setLoginLogs).catch(() => {}); }, []);
   async function saveCommission(email: string, rate: number) { setRateSaving(email); try { await apiFetch('/api/admin', { method: 'PUT', body: JSON.stringify({ email, commission_rate: rate }) }); await load(); } catch (e: any) { setError(e.message); } finally { setRateSaving(null); } }
   const [reassigning, setReassigning] = useState<number | null>(null);
   async function reassignLead(leadId: number, newOwner: string) { setReassigning(leadId); try { await apiFetch('/api/leads', { method: 'PUT', body: JSON.stringify({ id: leadId, fields: { lead_owner: newOwner } }) }); await load(); } catch (e: any) { setError(e.message); } finally { setReassigning(null); } }
@@ -240,6 +238,7 @@ function AdminPortal() {
   const totalDeals = data.opportunities.reduce((s: number, o: Opportunity) => s + Number(o.amount), 0);
   const maintenance = data.maintenance.filter((m: MaintenancePlan) => m.status === 'Active').reduce((s: number, m: MaintenancePlan) => s + Number(m.monthly_fee), 0);
   const repNameByEmail: Record<string, string> = {}; data.reps.forEach((r: SalesRep) => { repNameByEmail[r.email] = r.name; });
+  const loginLogs: { id: number; rep_email: string; logged_in_at: string }[] = data.loginLogs || [];
   const loginsByDay: Record<string, typeof loginLogs> = {};
   loginLogs.forEach((l) => { const day = new Date(l.logged_in_at).toDateString(); (loginsByDay[day] ||= []).push(l); });
   const todayStr = new Date().toDateString();
