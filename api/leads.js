@@ -27,6 +27,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       let query = supabase.from('leads').select('*').order('created_at', { ascending: false });
       if (profile.role !== 'admin') query = query.eq('lead_owner', profile.email);
+      else if (req.query.owner) query = query.eq('lead_owner', req.query.owner);
       const { data, error } = await query;
       if (error) throw error;
       return res.status(200).json(data);
