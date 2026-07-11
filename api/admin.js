@@ -31,16 +31,18 @@ export default async function handler(req, res) {
       return res.status(200).json(data);
     }
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-    const [reps, leads, accounts, contacts, opportunities, activities, maintenance] = await Promise.all([
+    const [reps, leads, accounts, contacts, opportunities, activities, maintenance, loginLogsRes] = await Promise.all([
       supabase.from('sales_reps').select('*').order('role', { ascending: true }),
       supabase.from('leads').select('*').order('created_at', { ascending: false }),
       supabase.from('accounts').select('*').order('company_name', { ascending: true }),
       supabase.from('contacts').select('*').order('id', { ascending: true }),
       supabase.from('opportunities').select('*').order('close_date', { ascending: true }),
       supabase.from('activities').select('*').order('created_at', { ascending: false }).limit(100),
-      supabase.from('monthly_maintenance').select('*').order('next_invoice_date', { ascending: true })
+      supabase.from('monthly_maintenance').select('*').order('next_invoice_date', { ascending: true }),
+      supabase.from('login_logs').select('*').order('logged_in_at', { ascending: false }).limit(300)
     ]);
     for (const result of [reps, leads, accounts, contacts, opportunities, activities, maintenance]) if (result.error) throw result.error;
+    const loginLogs = loginLogsRes.error ? [] : loginLogsRes.data;
 
     // Commission per rep: sum of (Closed Won deal amount * their commission_rate) they own
     const repsWithCommission = reps.data.map((rep) => {
@@ -57,7 +59,7 @@ export default async function handler(req, res) {
     const overdueInvoices = activeMaint.filter((m) => new Date(m.next_invoice_date) < now);
     const upcomingInvoices = activeMaint.filter((m) => { const d = new Date(m.next_invoice_date); return d >= now && d <= in3Days; });
 
-    return res.status(200).json({ reps: repsWithCommission, leads: leads.data, accounts: accounts.data, contacts: contacts.data, opportunities: opportunities.data, activities: activities.data, maintenance: maintenance.data, overdueInvoices, upcomingInvoices });
+    return res.status(200).json({ reps: repsWithCommission, leads: leads.data, accounts: accounts.data, contacts: contacts.data, opportunities: opportunities.data, activities: activities.data, maintenance: maintenance.data, overdueInvoices, upcomingInvoices, loginLogs });
   } catch (err) {
     console.error('API error:', err);
     const status = err.message === 'Unauthorized' || err.message === 'Invalid token' ? 401 : err.message.includes('Admin') ? 403 : 500;
