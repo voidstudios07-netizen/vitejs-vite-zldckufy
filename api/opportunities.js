@@ -24,9 +24,12 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       let query = supabase.from('opportunities').select('*').order('close_date', { ascending: true });
       if (profile.role !== 'admin') query = query.eq('owner_email', profile.email);
+      else if (req.query.owner) query = query.eq('owner_email', req.query.owner);
       const { data, error } = await query;
       if (error) throw error;
-      return res.status(200).json(data);
+      const rate = Number(profile.commission_rate ?? 10);
+      const withCommission = data.map((o) => ({ ...o, commission_amount: o.stage === 'Closed Won' ? Number(o.amount || 0) * (rate / 100) : null }));
+      return res.status(200).json(withCommission);
     }
     if (req.method === 'POST') {
       const body = req.body || {};
