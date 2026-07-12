@@ -76,7 +76,10 @@ export default async function handler(req, res) {
     const { data: profile } = await supabase.from('sales_reps').select('*').eq('email', sanitizedEmail).single();
 
     // Log this login for admin visibility (awaited so it actually saves — but never fails the login if it errors)
-    try { await supabase.from('login_logs').insert({ rep_email: sanitizedEmail }); } catch { /* never block login on this */ }
+    try {
+      const { error: logErr } = await supabase.from('login_logs').insert({ rep_email: sanitizedEmail });
+      if (logErr) console.error('login_logs insert failed:', logErr.message, logErr.details, logErr.hint);
+    } catch (e) { console.error('login_logs insert threw:', e.message); }
 
     return res.status(200).json({ 
       session: data.session, 
