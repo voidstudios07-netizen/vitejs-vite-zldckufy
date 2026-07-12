@@ -12,8 +12,21 @@ export default async function handler(req, res) {
   
   try {
     if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    
-    const { email, password, mode } = req.body || {};
+
+    const body = req.body || {};
+
+    // LOGOUT: close out the rep's most recent open session
+    if (body.mode === 'logout') {
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (!token) return res.status(401).json({ error: 'Unauthorized' });
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !user) return res.status(401).json({ error: 'Invalid token' });
+      const { data: openSession } = await supabase.from('login_logs').select('id').eq('rep_email', user.email).is('logout_at', null).order('logged_in_at', { ascending: false }).limit(1).maybeSingle();
+      if (openSession) await supabase.from('login_logs').update({ logout_at: new Date().toISOString() }).eq('id', openSession.id);
+      return res.status(200).json({ ok: true });
+    }
+
+    const { email, password, mode } = body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
 
     const sanitizedEmail = email.trim().toLowerCase();
