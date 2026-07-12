@@ -15,7 +15,7 @@ function App() {
   useEffect(() => { if (!tokenStore.get()) { setChecking(false); return; } apiFetch<UserState>('/api/me').then(setAuth).catch(() => tokenStore.clear()).finally(() => setChecking(false)); }, []);
   if (checking) return <div className="grid min-h-screen place-items-center bg-[#08090c] text-white"><Sparkles className="animate-pulse text-cyan-300" /></div>;
   if (!auth) return <Login onLogin={setAuth} />;
-  return <Shell auth={auth} view={view} setView={setView} onLogout={() => { tokenStore.clear(); setAuth(null); }} />;
+  return <Shell auth={auth} view={view} setView={setView} onLogout={() => { apiFetch('/api/auth', { method: 'POST', body: JSON.stringify({ mode: 'logout' }) }).catch(() => {}).finally(() => { tokenStore.clear(); setAuth(null); }); }} />;
 }
 
 function Login({ onLogin }: { onLogin: (u: UserState) => void }) {
@@ -238,7 +238,9 @@ function AdminPortal() {
   const totalDeals = data.opportunities.reduce((s: number, o: Opportunity) => s + Number(o.amount), 0);
   const maintenance = data.maintenance.filter((m: MaintenancePlan) => m.status === 'Active').reduce((s: number, m: MaintenancePlan) => s + Number(m.monthly_fee), 0);
   const repNameByEmail: Record<string, string> = {}; data.reps.forEach((r: SalesRep) => { repNameByEmail[r.email] = r.name; });
-  const loginLogs: { id: number; rep_email: string; logged_in_at: string }[] = data.loginLogs || [];
+  const loginLogs: { id: number; rep_email: string; logged_in_at: string; logout_at?: string | null }[] = data.loginLogs || [];
+  const sessionMs = (l: typeof loginLogs[number]) => (l.logout_at ? new Date(l.logout_at).getTime() : Date.now()) - new Date(l.logged_in_at).getTime();
+  const formatHrs = (ms: number) => { const h = Math.floor(ms / 3600000); const m = Math.round((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
   const loginsByDay: Record<string, typeof loginLogs> = {};
   loginLogs.forEach((l) => { const day = new Date(l.logged_in_at).toDateString(); (loginsByDay[day] ||= []).push(l); });
   const todayStr = new Date().toDateString();
@@ -359,13 +361,22 @@ function AdminPortal() {
       </div>
 
       <div className="mt-6 rounded-3xl border border-white/10 bg-[#101218] p-5">
-        <div className="mb-4 text-base font-semibold text-slate-200">Employee Login Activity</div>
+        <div className="mb-4 text-base font-semibold text-slate-200">Employee Login Activity & Hours Worked</div>
         {loginDayKeys.length === 0 && <p className="text-sm text-slate-500">No login activity recorded yet.</p>}
-        <div className="max-h-96 overflow-y-auto space-y-4 pr-1">
-          {loginDayKeys.map((day) => <div key={day}>
-            <div className="mb-1.5 text-xs font-semibold uppercase tracking-wider text-cyan-300">{day === todayStr ? 'Today' : day}</div>
-            <div className="space-y-1.5">{loginsByDay[day].map((l) => <div key={l.id} className="flex items-center justify-between rounded-xl bg-white/[.03] px-3 py-2 text-sm"><span className="text-slate-200">{repNameByEmail[l.rep_email] || l.rep_email}</span><span className="text-xs text-slate-500">{new Date(l.logged_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>)}</div>
-          </div>)}
+        <div className="max-h-[32rem] overflow-y-auto space-y-5 pr-1">
+          {loginDayKeys.map((day) => {
+            const dayLogs = loginsByDay[day];
+            const hoursByRep: Record<string, number> = {};
+            dayLogs.forEach((l) => { hoursByRep[l.rep_email] = (hoursByRep[l.rep_email] || 0) + sessionMs(l); });
+            return <div key={day}>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-cyan-300">{day === todayStr ? 'Today' : day}</div>
+              <div className="mb-2 flex flex-wrap gap-2">{Object.entries(hoursByRep).map(([email, ms]) => <span key={email} className="rounded-full bg-cyan-400/10 border border-cyan-400/20 px-3 py-1 text-xs text-cyan-100">{repNameByEmail[email] || email}: {formatHrs(ms)}</span>)}</div>
+              <div className="space-y-1.5">{dayLogs.map((l) => <div key={l.id} className="flex items-center justify-between rounded-xl bg-white/[.03] px-3 py-2 text-sm">
+                <span className="text-slate-200">{repNameByEmail[l.rep_email] || l.rep_email}</span>
+                <span className="text-xs text-slate-500">{new Date(l.logged_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → {l.logout_at ? new Date(l.logout_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-emerald-300">Active now</span>} · {formatHrs(sessionMs(l))}</span>
+              </div>)}</div>
+            </div>;
+          })}
         </div>
       </div>
 
