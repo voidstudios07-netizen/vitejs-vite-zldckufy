@@ -75,8 +75,8 @@ export default async function handler(req, res) {
     // Grab their pre-configured profile details
     const { data: profile } = await supabase.from('sales_reps').select('*').eq('email', sanitizedEmail).single();
 
-    // Log this login for admin visibility (non-blocking — never fail the login over this)
-    supabase.from('login_logs').insert({ rep_email: sanitizedEmail }).then(() => {}).catch(() => {});
+    // Log this login for admin visibility (awaited so it actually saves — but never fails the login if it errors)
+    try { await supabase.from('login_logs').insert({ rep_email: sanitizedEmail }); } catch { /* never block login on this */ }
 
     return res.status(200).json({ 
       session: data.session, 
