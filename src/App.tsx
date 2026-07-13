@@ -46,6 +46,13 @@ function Login({ onLogin }: { onLogin: (u: UserState) => void }) {
 
 function Shell({ auth, view, setView, onLogout }: { auth: NonNullable<UserState>; view: View; setView: (v: View) => void; onLogout: () => void }) {
   const nav = [{ id: 'dashboard', label: 'Dashboard', icon: BarChart3 }, { id: 'leads', label: 'Outbound Panel', icon: PhoneCall }, { id: 'pipeline', label: 'Pipeline', icon: KanbanSquare }, { id: 'maintenance', label: 'Monthly Maintenance', icon: Wrench }, { id: 'accounts', label: 'Accounts', icon: Building2 }, ...(auth.profile.role === 'admin' ? [{ id: 'admin' as const, label: 'Admin Portal', icon: Crown }] : [])] as const;
+  useEffect(() => {
+    const ping = () => { if (document.visibilityState === 'visible') apiFetch('/api/auth', { method: 'POST', body: JSON.stringify({ mode: 'heartbeat' }) }).catch(() => {}); };
+    ping();
+    const interval = setInterval(ping, 3 * 60 * 1000);
+    document.addEventListener('visibilitychange', ping);
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', ping); };
+  }, []);
   return <div className="flex min-h-screen bg-[#08090c] text-slate-100">
     <aside className="fixed inset-y-0 left-0 z-30 hidden w-72 border-r border-white/10 bg-[#0c0e13]/95 p-4 backdrop-blur md:block"><div className="mb-8 flex items-center justify-between px-2"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-violet-500 font-black text-black">V</div><div><div className="font-semibold">Void Studios</div><div className="text-xs text-slate-500">CRM</div></div></div><div className="flex items-center gap-2"><GlobalSearch /><NotificationBell profile={auth.profile} /></div></div><nav className="space-y-1">{nav.map((item) => <button key={item.id} onClick={() => setView(item.id)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-sm transition ${view === item.id ? 'bg-white text-black' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}><item.icon size={18} />{item.label}</button>)}</nav><div className="absolute bottom-4 left-4 right-4 rounded-2xl border border-white/10 bg-white/[.03] p-4"><div className="flex items-center gap-3"><div className="grid h-10 w-10 place-items-center rounded-full text-sm font-bold text-black" style={{ background: auth.profile.avatar_color }}>{auth.profile.name[0]}</div><div className="min-w-0"><div className="truncate text-sm font-medium">{auth.profile.name}</div><div className="truncate text-xs text-slate-500">{auth.profile.role === 'admin' ? 'Admin / Owner' : 'Sales Employee'}</div></div></div><button onClick={onLogout} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl border border-white/10 py-2 text-sm text-slate-400 hover:text-white"><LogOut size={16} /> Sign out</button></div></aside>
     <div className="min-w-0 flex-1 md:ml-72">
@@ -238,10 +245,16 @@ function AdminPortal() {
   const totalDeals = data.opportunities.reduce((s: number, o: Opportunity) => s + Number(o.amount), 0);
   const maintenance = data.maintenance.filter((m: MaintenancePlan) => m.status === 'Active').reduce((s: number, m: MaintenancePlan) => s + Number(m.monthly_fee), 0);
   const repNameByEmail: Record<string, string> = {}; data.reps.forEach((r: SalesRep) => { repNameByEmail[r.email] = r.name; });
-  const loginLogs: { id: number; rep_email: string; logged_in_at: string; logout_at?: string | null }[] = data.loginLogs || [];
+  const loginLogs: { id: number; rep_email: string; logged_in_at: string; logout_at?: string | null; last_seen?: string | null }[] = data.loginLogs || [];
+  const IDLE_MS = 15 * 60 * 1000;
   const SESSION_CAP_MS = 12 * 60 * 60 * 1000;
-  const sessionMs = (l: typeof loginLogs[number]) => { const start = new Date(l.logged_in_at).getTime(); if (l.logout_at) return new Date(l.logout_at).getTime() - start; return Math.min(Date.now() - start, SESSION_CAP_MS); };
-  const isAbandoned = (l: typeof loginLogs[number]) => !l.logout_at && (Date.now() - new Date(l.logged_in_at).getTime()) > SESSION_CAP_MS;
+  const effectiveEnd = (l: typeof loginLogs[number]) => {
+    if (l.logout_at) return new Date(l.logout_at).getTime();
+    if (l.last_seen) { const seen = new Date(l.last_seen).getTime(); return (Date.now() - seen) > IDLE_MS ? seen : Date.now(); }
+    return Math.min(Date.now(), new Date(l.logged_in_at).getTime() + SESSION_CAP_MS);
+  };
+  const sessionMs = (l: typeof loginLogs[number]) => effectiveEnd(l) - new Date(l.logged_in_at).getTime();
+  const isAbandoned = (l: typeof loginLogs[number]) => { if (l.logout_at) return false; if (l.last_seen) return (Date.now() - new Date(l.last_seen).getTime()) > IDLE_MS; return (Date.now() - new Date(l.logged_in_at).getTime()) > SESSION_CAP_MS; };
   const formatHrs = (ms: number) => { const h = Math.floor(ms / 3600000); const m = Math.round((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
   const loginsByDay: Record<string, typeof loginLogs> = {};
   loginLogs.forEach((l) => { const day = new Date(l.logged_in_at).toDateString(); (loginsByDay[day] ||= []).push(l); });
@@ -375,7 +388,7 @@ function AdminPortal() {
               <div className="mb-2 flex flex-wrap gap-2">{Object.entries(hoursByRep).map(([email, ms]) => <span key={email} className="rounded-full bg-cyan-400/10 border border-cyan-400/20 px-3 py-1 text-xs text-cyan-100">{repNameByEmail[email] || email}: {formatHrs(ms)}</span>)}</div>
               <div className="space-y-1.5">{dayLogs.map((l) => <div key={l.id} className="flex items-center justify-between rounded-xl bg-white/[.03] px-3 py-2 text-sm">
                 <span className="text-slate-200">{repNameByEmail[l.rep_email] || l.rep_email}</span>
-                <span className="text-xs text-slate-500">{new Date(l.logged_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → {l.logout_at ? new Date(l.logout_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : isAbandoned(l) ? <span className="text-amber-300">Auto-closed (12h+, likely left open)</span> : <span className="text-emerald-300">Active now</span>} · {formatHrs(sessionMs(l))}</span>
+                <span className="text-xs text-slate-500">{new Date(l.logged_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → {l.logout_at ? new Date(l.logout_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : isAbandoned(l) ? <span className="text-amber-300">Idle — session left open</span> : <span className="text-emerald-300">Active now</span>} · {formatHrs(sessionMs(l))}</span>
               </div>)}</div>
             </div>;
           })}
