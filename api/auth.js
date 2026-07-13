@@ -83,8 +83,18 @@ export default async function handler(req, res) {
     const { data, error } = await supabase.auth.signInWithPassword({ email: sanitizedEmail, password });
     if (error) return res.status(401).json({ error: 'Invalid login credentials.' });
     
-    // Grab their pre-configured profile details
-    const { data: profile } = await supabase.from('sales_reps').select('*').eq('email', sanitizedEmail).single();
+    // Grab their pre-configured profile details — retry once, since Supabase's free-tier
+    // database can be briefly asleep right after inactivity, causing the first query to fail.
+    async function fetchProfile() {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const { data: p, error: pErr } = await supabase.from('sales_reps').select('*').eq('email', sanitizedEmail).single();
+        if (p && !pErr) return p;
+        if (attempt === 0) await new Promise((r) => setTimeout(r, 1200));
+      }
+      return null;
+    }
+    const profile = await fetchProfile();
+    if (!profile) return res.status(503).json({ error: 'The server was waking up from idle — please try logging in again, it should work now.' });
 
     // Log this login for admin visibility (awaited so it actually saves — but never fails the login if it errors)
     try {
