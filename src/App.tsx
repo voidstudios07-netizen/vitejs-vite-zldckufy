@@ -239,7 +239,9 @@ function AdminPortal() {
   const maintenance = data.maintenance.filter((m: MaintenancePlan) => m.status === 'Active').reduce((s: number, m: MaintenancePlan) => s + Number(m.monthly_fee), 0);
   const repNameByEmail: Record<string, string> = {}; data.reps.forEach((r: SalesRep) => { repNameByEmail[r.email] = r.name; });
   const loginLogs: { id: number; rep_email: string; logged_in_at: string; logout_at?: string | null }[] = data.loginLogs || [];
-  const sessionMs = (l: typeof loginLogs[number]) => (l.logout_at ? new Date(l.logout_at).getTime() : Date.now()) - new Date(l.logged_in_at).getTime();
+  const SESSION_CAP_MS = 12 * 60 * 60 * 1000;
+  const sessionMs = (l: typeof loginLogs[number]) => { const start = new Date(l.logged_in_at).getTime(); if (l.logout_at) return new Date(l.logout_at).getTime() - start; return Math.min(Date.now() - start, SESSION_CAP_MS); };
+  const isAbandoned = (l: typeof loginLogs[number]) => !l.logout_at && (Date.now() - new Date(l.logged_in_at).getTime()) > SESSION_CAP_MS;
   const formatHrs = (ms: number) => { const h = Math.floor(ms / 3600000); const m = Math.round((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
   const loginsByDay: Record<string, typeof loginLogs> = {};
   loginLogs.forEach((l) => { const day = new Date(l.logged_in_at).toDateString(); (loginsByDay[day] ||= []).push(l); });
@@ -373,7 +375,7 @@ function AdminPortal() {
               <div className="mb-2 flex flex-wrap gap-2">{Object.entries(hoursByRep).map(([email, ms]) => <span key={email} className="rounded-full bg-cyan-400/10 border border-cyan-400/20 px-3 py-1 text-xs text-cyan-100">{repNameByEmail[email] || email}: {formatHrs(ms)}</span>)}</div>
               <div className="space-y-1.5">{dayLogs.map((l) => <div key={l.id} className="flex items-center justify-between rounded-xl bg-white/[.03] px-3 py-2 text-sm">
                 <span className="text-slate-200">{repNameByEmail[l.rep_email] || l.rep_email}</span>
-                <span className="text-xs text-slate-500">{new Date(l.logged_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → {l.logout_at ? new Date(l.logout_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : <span className="text-emerald-300">Active now</span>} · {formatHrs(sessionMs(l))}</span>
+                <span className="text-xs text-slate-500">{new Date(l.logged_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → {l.logout_at ? new Date(l.logout_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : isAbandoned(l) ? <span className="text-amber-300">Auto-closed (12h+, likely left open)</span> : <span className="text-emerald-300">Active now</span>} · {formatHrs(sessionMs(l))}</span>
               </div>)}</div>
             </div>;
           })}
