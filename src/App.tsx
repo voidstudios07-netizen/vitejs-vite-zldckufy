@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Component, ReactNode, useEffect, useState } from 'react';
 import { AlertTriangle, BarChart3, Bell, Building2, ChevronLeft, ChevronRight, Crown, KanbanSquare, LogOut, MessageCircle, PhoneCall, Search, Settings, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 import { Account, apiFetch, Contact, isDueSoon, isOverdue, Lead, MaintenancePlan, money, Opportunity, SalesRep, tcv, tokenStore } from './api';
 
@@ -14,8 +14,19 @@ function App() {
   const [checking, setChecking] = useState(true);
   useEffect(() => { if (!tokenStore.get()) { setChecking(false); return; } apiFetch<UserState>('/api/me').then(setAuth).catch(() => tokenStore.clear()).finally(() => setChecking(false)); }, []);
   if (checking) return <div className="grid min-h-screen place-items-center bg-[#08090c] text-white"><Sparkles className="animate-pulse text-cyan-300" /></div>;
-  if (!auth) return <Login onLogin={setAuth} />;
-  return <Shell auth={auth} view={view} setView={setView} onLogout={() => { apiFetch('/api/auth', { method: 'POST', body: JSON.stringify({ mode: 'logout' }) }).catch(() => {}).finally(() => { tokenStore.clear(); setAuth(null); }); }} />;
+  return <ErrorBoundary>
+    {!auth ? <Login onLogin={setAuth} /> : <Shell auth={auth} view={view} setView={setView} onLogout={() => { apiFetch('/api/auth', { method: 'POST', body: JSON.stringify({ mode: 'logout' }) }).catch(() => {}).finally(() => { tokenStore.clear(); setAuth(null); }); }} />}
+  </ErrorBoundary>;
+}
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
+  componentDidCatch(error: unknown) { console.error('Uncaught render error:', error); }
+  render() {
+    if (this.state.hasError) return <div className="grid min-h-screen place-items-center bg-[#08090c] p-6 text-center text-white"><div><p className="mb-4 text-lg font-semibold">Something went wrong loading the CRM.</p><p className="mb-5 text-sm text-slate-400">This is usually temporary — try reloading the page.</p><button onClick={() => window.location.reload()} className="rounded-xl bg-white px-6 py-2.5 font-semibold text-black">Reload</button></div></div>;
+    return this.props.children;
+  }
 }
 
 function Login({ onLogin }: { onLogin: (u: UserState) => void }) {
