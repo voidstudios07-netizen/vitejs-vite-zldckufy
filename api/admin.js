@@ -39,7 +39,7 @@ export default async function handler(req, res) {
       supabase.from('opportunities').select('*').order('close_date', { ascending: true }),
       supabase.from('activities').select('*').order('created_at', { ascending: false }).limit(100),
       supabase.from('monthly_maintenance').select('*').order('next_invoice_date', { ascending: true }),
-      supabase.from('login_logs').select('*').order('logged_in_at', { ascending: false }).limit(300)
+      supabase.from('login_logs').select('*').order('logged_in_at', { ascending: false }).limit(2000)
     ]);
     for (const result of [reps, leads, accounts, contacts, opportunities, activities, maintenance]) if (result.error) throw result.error;
     const loginLogs = loginLogsRes.error ? [] : loginLogsRes.data;
