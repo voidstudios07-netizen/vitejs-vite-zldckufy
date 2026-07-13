@@ -89,6 +89,7 @@ export default async function handler(req, res) {
       for (let attempt = 0; attempt < 2; attempt++) {
         const { data: p, error: pErr } = await supabase.from('sales_reps').select('*').eq('email', sanitizedEmail).single();
         if (p && !pErr) return p;
+        if (pErr) console.error(`fetchProfile attempt ${attempt} failed:`, pErr.message, pErr.details, pErr.hint, pErr.code);
         if (attempt === 0) await new Promise((r) => setTimeout(r, 1200));
       }
       return null;
