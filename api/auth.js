@@ -26,6 +26,17 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true });
     }
 
+    // HEARTBEAT: mark the rep's open session as still active (called every few minutes while the tab is visible)
+    if (body.mode === 'heartbeat') {
+      const token = req.headers.authorization?.replace('Bearer ', '');
+      if (!token) return res.status(401).json({ error: 'Unauthorized' });
+      const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+      if (userError || !user) return res.status(401).json({ error: 'Invalid token' });
+      const { data: openSession } = await supabase.from('login_logs').select('id').eq('rep_email', user.email).is('logout_at', null).order('logged_in_at', { ascending: false }).limit(1).maybeSingle();
+      if (openSession) await supabase.from('login_logs').update({ last_seen: new Date().toISOString() }).eq('id', openSession.id);
+      return res.status(200).json({ ok: true });
+    }
+
     const { email, password, mode } = body;
     if (!email || !password) return res.status(400).json({ error: 'Email and password are required.' });
 
@@ -77,7 +88,8 @@ export default async function handler(req, res) {
 
     // Log this login for admin visibility (awaited so it actually saves — but never fails the login if it errors)
     try {
-      const { error: logErr } = await supabase.from('login_logs').insert({ rep_email: sanitizedEmail });
+      const now = new Date().toISOString();
+      const { error: logErr } = await supabase.from('login_logs').insert({ rep_email: sanitizedEmail, last_seen: now });
       if (logErr) console.error('login_logs insert failed:', logErr.message, logErr.details, logErr.hint);
     } catch (e) { console.error('login_logs insert threw:', e.message); }
 
