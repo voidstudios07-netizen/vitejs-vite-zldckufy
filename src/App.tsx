@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, BarChart3, Bell, Building2, Crown, KanbanSquare, LogOut, MessageCircle, PhoneCall, Search, Settings, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
+import { AlertTriangle, BarChart3, Bell, Building2, ChevronLeft, ChevronRight, Crown, KanbanSquare, LogOut, MessageCircle, PhoneCall, Search, Settings, ShieldCheck, Sparkles, Wrench } from 'lucide-react';
 import { Account, apiFetch, Contact, isDueSoon, isOverdue, Lead, MaintenancePlan, money, Opportunity, SalesRep, tcv, tokenStore } from './api';
 
 type View = 'dashboard' | 'leads' | 'pipeline' | 'accounts' | 'maintenance' | 'admin';
@@ -375,6 +375,10 @@ function AdminPortal() {
         </div>
       </div>
 
+      <div className="mt-6">
+        <AttendanceCalendar loginLogs={loginLogs} reps={data.reps} repNameByEmail={repNameByEmail} />
+      </div>
+
       <div className="mt-6 rounded-3xl border border-white/10 bg-[#101218] p-5">
         <div className="mb-4 text-base font-semibold text-slate-200">Employee Login Activity & Hours Worked</div>
         {loginDayKeys.length === 0 && <p className="text-sm text-slate-500">No login activity recorded yet.</p>}
@@ -416,6 +420,59 @@ function AdminPortal() {
       </div>
     </section>
   );
+}
+
+function AttendanceCalendar({ loginLogs, reps, repNameByEmail }: { loginLogs: { id: number; rep_email: string; logged_in_at: string; logout_at?: string | null; last_seen?: string | null }[]; reps: SalesRep[]; repNameByEmail: Record<string, string> }) {
+  const [selectedRep, setSelectedRep] = useState('all');
+  const [cursor, setCursor] = useState(() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d; });
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const IDLE_MS = 15 * 60 * 1000;
+  const SESSION_CAP_MS = 12 * 60 * 60 * 1000;
+  const effectiveEnd = (l: typeof loginLogs[number]) => {
+    if (l.logout_at) return new Date(l.logout_at).getTime();
+    if (l.last_seen) { const seen = new Date(l.last_seen).getTime(); return (Date.now() - seen) > IDLE_MS ? seen : Date.now(); }
+    return Math.min(Date.now(), new Date(l.logged_in_at).getTime() + SESSION_CAP_MS);
+  };
+  const sessionMs = (l: typeof loginLogs[number]) => effectiveEnd(l) - new Date(l.logged_in_at).getTime();
+  const dateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const formatHrs = (ms: number) => { const h = Math.floor(ms / 3600000); const m = Math.round((ms % 3600000) / 60000); return h > 0 ? `${h}h ${m}m` : `${m}m`; };
+
+  const filtered = selectedRep === 'all' ? loginLogs : loginLogs.filter((l) => l.rep_email === selectedRep);
+  const msByDay: Record<string, number> = {};
+  filtered.forEach((l) => { const key = dateKey(new Date(l.logged_in_at)); msByDay[key] = (msByDay[key] || 0) + sessionMs(l); });
+
+  const year = cursor.getFullYear(), month = cursor.getMonth();
+  const startOffset = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const monthLabel = cursor.toLocaleDateString([], { month: 'long', year: 'numeric' });
+  let monthTotalMs = 0;
+  for (let d = 1; d <= daysInMonth; d++) monthTotalMs += msByDay[dateKey(new Date(year, month, d))] || 0;
+
+  const now = new Date();
+  const dayOfWeek = (now.getDay() + 6) % 7;
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - dayOfWeek); weekStart.setHours(0, 0, 0, 0);
+  let weekTotalMs = 0;
+  for (let i = 0; i < 7; i++) { const d = new Date(weekStart); d.setDate(weekStart.getDate() + i); weekTotalMs += msByDay[dateKey(d)] || 0; }
+
+  const intensity = (ms: number) => { const h = ms / 3600000; if (h <= 0) return 'bg-white/[.02] text-slate-600'; if (h < 2) return 'bg-emerald-500/10 text-emerald-200'; if (h < 5) return 'bg-emerald-500/20 text-emerald-100'; if (h < 8) return 'bg-emerald-500/35 text-emerald-50'; return 'bg-emerald-500/55 text-white'; };
+  const cells: (number | null)[] = [...Array(startOffset).fill(null), ...Array.from({ length: daysInMonth }, (_, i) => i + 1)];
+  const todayKey = dateKey(new Date());
+  const daySessions = selectedDay ? filtered.filter((l) => dateKey(new Date(l.logged_in_at)) === selectedDay) : [];
+
+  return <div className="rounded-3xl border border-white/10 bg-[#101218] p-5">
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      <div className="text-base font-semibold text-slate-200">Attendance Calendar</div>
+      <select value={selectedRep} onChange={(e) => { setSelectedRep(e.target.value); setSelectedDay(null); }} className="field !py-1.5 !px-3 text-xs"><option value="all">All Reps (combined)</option>{reps.map((r) => <option key={r.email} value={r.email}>{r.name}</option>)}</select>
+    </div>
+    <div className="mb-4 grid gap-3 sm:grid-cols-2">
+      <div className="rounded-2xl bg-cyan-400/5 border border-cyan-400/20 p-3"><div className="text-xs text-cyan-200/70">This Week</div><div className="text-xl font-bold text-cyan-100">{formatHrs(weekTotalMs)}</div></div>
+      <div className="rounded-2xl bg-violet-400/5 border border-violet-400/20 p-3"><div className="text-xs text-violet-200/70">{monthLabel}</div><div className="text-xl font-bold text-violet-100">{formatHrs(monthTotalMs)}</div></div>
+    </div>
+    <div className="mb-3 flex items-center justify-between"><button onClick={() => setCursor(new Date(year, month - 1, 1))} className="rounded-lg border border-white/10 p-1.5 text-slate-400 hover:text-white"><ChevronLeft size={16} /></button><div className="text-sm font-semibold">{monthLabel}</div><button onClick={() => setCursor(new Date(year, month + 1, 1))} className="rounded-lg border border-white/10 p-1.5 text-slate-400 hover:text-white"><ChevronRight size={16} /></button></div>
+    <div className="grid grid-cols-7 gap-1 mb-1 text-center text-[10px] uppercase text-slate-500">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => <div key={d}>{d}</div>)}</div>
+    <div className="grid grid-cols-7 gap-1">{cells.map((day, idx) => { if (day === null) return <div key={idx} />; const key = dateKey(new Date(year, month, day)); const ms = msByDay[key] || 0; return <button key={idx} onClick={() => setSelectedDay(key === selectedDay ? null : key)} className={`aspect-square rounded-lg p-1 text-left text-[11px] transition ${intensity(ms)} ${key === todayKey ? 'ring-1 ring-cyan-300' : ''} ${key === selectedDay ? 'ring-2 ring-white' : ''}`}><div className="font-semibold">{day}</div>{ms > 0 && <div className="text-[9px] opacity-80">{formatHrs(ms)}</div>}</button>; })}</div>
+    {selectedDay && <div className="mt-4 border-t border-white/5 pt-4"><div className="mb-2 text-xs uppercase text-slate-500">{new Date(selectedDay + 'T00:00:00').toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}</div>{daySessions.length === 0 && <p className="text-sm text-slate-500">No sessions this day.</p>}<div className="max-h-52 space-y-1.5 overflow-y-auto pr-1">{daySessions.map((l) => <div key={l.id} className="flex items-center justify-between rounded-xl bg-white/[.03] px-3 py-2 text-sm"><span className="text-slate-200">{repNameByEmail[l.rep_email] || l.rep_email}</span><span className="text-xs text-slate-500">{new Date(l.logged_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} → {l.logout_at ? new Date(l.logout_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Active/Idle'} · {formatHrs(sessionMs(l))}</span></div>)}</div></div>}
+  </div>;
 }
 
 function AdminTable({ title, rows, cols, moneyKey }: { title: string; rows: any[]; cols: [string, string][]; moneyKey?: string }) { return <div className="overflow-hidden rounded-3xl border border-white/10 bg-[#101218]"><div className="border-b border-white/10 p-4 font-semibold">{title}</div><div className="max-h-96 overflow-auto"><table className="w-full min-w-[560px] text-left text-sm"><thead className="sticky top-0 bg-[#101218] text-xs uppercase text-slate-500"><tr>{cols.map((c) => <th key={c[0]} className="p-3">{c[1]}</th>)}</tr></thead><tbody>{rows.map((row, idx) => <tr key={row.id || idx} className="border-t border-white/5">{cols.map((c) => <td key={c[0]} className="p-3 text-slate-300">{moneyKey === c[0] ? money(row[c[0]]) : String(row[c[0]] ?? '').slice(0, 80)}</td>)}</tr>)}</tbody></table></div></div>; }
