@@ -83,19 +83,21 @@ export default async function handler(req, res) {
     const { data, error } = await supabase.auth.signInWithPassword({ email: sanitizedEmail, password });
     if (error) return res.status(401).json({ error: 'Invalid login credentials.' });
     
-    // Grab their pre-configured profile details — retry once, since Supabase's free-tier
-    // database can be briefly asleep right after inactivity, causing the first query to fail.
+    // Grab their pre-configured profile details. Uses maybeSingle() so a genuinely
+    // missing profile (null, no error) is distinguished from a transient DB error worth retrying.
     async function fetchProfile() {
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const { data: p, error: pErr } = await supabase.from('sales_reps').select('*').eq('email', sanitizedEmail).single();
-        if (p && !pErr) return p;
-        if (pErr) console.error(`fetchProfile attempt ${attempt} failed:`, pErr.message, pErr.details, pErr.hint, pErr.code);
-        if (attempt === 0) await new Promise((r) => setTimeout(r, 1200));
+      const delays = [0, 1000, 2500];
+      for (let attempt = 0; attempt < delays.length; attempt++) {
+        if (delays[attempt]) await new Promise((r) => setTimeout(r, delays[attempt]));
+        const { data: p, error: pErr } = await supabase.from('sales_reps').select('*').eq('email', sanitizedEmail).maybeSingle();
+        if (!pErr) return { profile: p, transient: false };
+        console.error(`fetchProfile attempt ${attempt} failed:`, pErr.message, pErr.details, pErr.hint, pErr.code);
       }
-      return null;
+      return { profile: null, transient: true };
     }
-    const profile = await fetchProfile();
-    if (!profile) return res.status(503).json({ error: 'The server was waking up from idle — please try logging in again, it should work now.' });
+    const { profile, transient } = await fetchProfile();
+    if (transient) return res.status(503).json({ error: 'Temporary server hiccup — please try logging in again.' });
+    if (!profile) return res.status(403).json({ error: 'Your login succeeded but no employee profile was found for this email. Contact your admin.' });
 
     // Log this login for admin visibility (awaited so it actually saves — but never fails the login if it errors)
     try {
