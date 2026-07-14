@@ -60,15 +60,6 @@ export default async function handler(req, res) {
         });
       }
 
-      // Admin accounts must be created directly in Supabase by the owner,
-      // never through self-service signup — this prevents anyone who
-      // discovers/guesses the admin email from claiming that account.
-      if (approvedMember.role === 'admin') {
-        return res.status(403).json({
-          error: 'This account already exists. Please log in instead of signing up.'
-        });
-      }
-
       // Create their credentials securely using your master bypass key
       const { error: createError } = await supabase.auth.admin.createUser({ 
         email: sanitizedEmail, 
