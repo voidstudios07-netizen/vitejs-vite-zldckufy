@@ -95,7 +95,7 @@ function NotificationBell({ profile }: { profile: SalesRep }) {
   }
   const total = overdue.length + upcoming.length + messages.length;
   return <div className="relative"><button onClick={() => { setOpen((o) => !o); if (!open) loadAll(); }} className="relative grid h-9 w-9 place-items-center rounded-lg border border-white/10 text-slate-300 hover:text-white"><Bell size={16} />{total > 0 && <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-[10px] font-bold text-white">{total}</span>}</button>
-    {open && <div className="absolute right-0 top-11 z-40 w-80 max-w-[85vw] max-h-[70vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#101218] p-3 shadow-2xl">
+    {open && <div className="absolute left-0 top-11 z-40 w-80 max-w-[85vw] max-h-[70vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#101218] p-3 shadow-2xl">
       {profile.role === 'admin' && <div className="mb-3 rounded-xl border border-cyan-400/20 bg-cyan-400/5 p-3">
         <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-cyan-300">Send a message</div>
         <select value={composeTo} onChange={(e) => setComposeTo(e.target.value)} className="field w-full mb-2 !py-1.5 !px-2 text-xs"><option value="">All employees</option>{reps.filter((r) => r.email !== profile.email).map((r) => <option key={r.email} value={r.email}>{r.name}</option>)}</select>
