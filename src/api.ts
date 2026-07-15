@@ -24,7 +24,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
   return data;
 }
 
-export const money = (value: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(Number(value || 0));
+export const money = (value: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(Number(value || 0));
 export const tcv = (opp: Opportunity) => opp.revenue_type === 'Recurring Retainer' ? Number(opp.amount) * Number(opp.contract_term || 1) : Number(opp.amount);
 export const isOverdue = (plan: MaintenancePlan) => plan.status === 'Active' && new Date(plan.next_invoice_date) < new Date();
 export const isDueSoon = (plan: MaintenancePlan) => { if (plan.status !== 'Active') return false; const d = new Date(plan.next_invoice_date); const now = new Date(); const in3 = new Date(Date.now() + 3 * 86400000); return d >= now && d <= in3; };
