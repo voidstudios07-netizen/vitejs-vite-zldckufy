@@ -35,7 +35,17 @@ export default async function handler(req, res) {
         .order('created_at', { ascending: false })
         .limit(30);
       if (error) throw error;
-      return res.status(200).json(data);
+      const readAt = profile.messages_read_at ? new Date(profile.messages_read_at).getTime() : 0;
+      const unreadCount = data.filter((m) => new Date(m.created_at).getTime() > readAt).length;
+      return res.status(200).json({ messages: data, unreadCount });
+    }
+    if (req.method === 'PUT') {
+      if (req.body?.mode === 'mark_read') {
+        const { error } = await supabase.from('sales_reps').update({ messages_read_at: new Date().toISOString() }).eq('email', profile.email);
+        if (error) throw error;
+        return res.status(200).json({ ok: true });
+      }
+      return res.status(400).json({ error: 'Unknown PUT action.' });
     }
     if (req.method === 'POST') {
       if (profile.role !== 'admin') return res.status(403).json({ error: 'Only admins can send messages.' });
